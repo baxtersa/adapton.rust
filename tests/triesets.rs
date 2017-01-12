@@ -2,7 +2,7 @@ extern crate adapton;
 
 use std::rc::Rc;
 use adapton::engine::*;
-use adapton::engine::manage::*;
+use adapton::collections::{SetIntro, SetElim};
 use adapton::collections::trie::*;
 
 #[test]
@@ -41,15 +41,15 @@ fn test_equal() {
 fn test_set() {
     init_dcg();
     let e: Set<usize> = SetIntro::empty();
-    assert!(!Set::mem(&e, &7));
-    assert!(!Set::mem(&e, &1));
+    assert!(!Set::is_mem(&e, &7));
+    assert!(!Set::is_mem(&e, &1));
     let s = SetIntro::add(e, 7);
     let s = SetIntro::add(s, 1);
     let s = SetIntro::add(s, 8);
-    assert!(Set::mem(&s, &1));
-    assert!(Set::mem(&s, &7));
-    assert!(Set::mem(&s, &8));
-    assert!(!Set::mem(&s, &0));
+    assert!(Set::is_mem(&s, &1));
+    assert!(Set::is_mem(&s, &7));
+    assert!(Set::is_mem(&s, &8));
+    assert!(!Set::is_mem(&s, &0));
 }
 
 // Order in which elements are added to sets doesn't matter.
@@ -69,10 +69,10 @@ fn test_set_equal() {
 }
 
 
-fn push_input(i: usize, t: Trie<usize>) -> Trie<usize> {
-    let t = Trie::art(cell(name_of_usize(i), t));
-    let t = Trie::name(name_of_usize(i), t);
-    Trie::extend(name_unit(), t, i)
+fn push_input(i: usize, t: Set<usize>) -> Set<usize> {
+    let t = Set::art(cell(name_of_usize(i), t));
+    let t = Set::name(name_of_usize(i), t);
+    Set::add(t, i)
 }
 
 #[test]
@@ -80,8 +80,8 @@ fn test_set_fold() {
     init_dcg();
     let mut dcg = init_naive();
 
-    let mut naive_input: Trie<usize> = SetIntro::empty();
-    let mut dcg_input: Trie<usize> = SetIntro::empty();
+    let mut naive_input: Set<usize> = SetIntro::empty();
+    let mut dcg_input: Set<usize> = SetIntro::empty();
 
     let mut v = Vec::new();
 
@@ -91,14 +91,14 @@ fn test_set_fold() {
         naive_input = push_input(i, naive_input.clone());
         let naive_out = trie_fold(naive_input.clone(),
                                 0,
-                                Rc::new(|i_, acc| i_ + acc));
+                                Rc::new(|(i_, ()), acc| i_ + acc));
 
         use_engine(dcg);
         assert!(engine_is_dcg());
         dcg_input = push_input(i, dcg_input.clone());
         let dcg_out = trie_fold(dcg_input.clone(),
                                 0,
-                                Rc::new(|i_, acc| i_ + acc));
+                                Rc::new(|(i_, ()), acc| i_ + acc));
 
         assert_eq!(naive_out, dcg_out);
         assert_eq!(naive_out, v.iter().sum());

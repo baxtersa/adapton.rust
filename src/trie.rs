@@ -4,7 +4,7 @@ use std::collections::hash_map::DefaultHasher;
 use std::rc::Rc;
 use std::cmp::min;
 
-use adapton::collections::{ListIntro, ListElim, list_fold};
+use adapton::collections::{ListIntro, ListElim, MapIntro, MapElim, list_fold};
 use adapton::bitstring::*;
 use adapton::engine::*;
 use macros::*;
@@ -418,59 +418,68 @@ impl<X: Debug + Hash + PartialEq + Eq + Clone + 'static> TrieElim<X> for Trie<X>
     }
 }
 
-pub trait SetIntro<X>: Debug + Hash + PartialEq + Eq + Clone + 'static {
-    fn empty() -> Self;
-    fn add(Self, e: X) -> Self;
-    // fn remove(Self, e: &X) -> Self;
-    // fn union(Self, Self) -> Self;
-    // fn inter(Self, Self) -> Self;
-    // fn diff(Self, Self) -> Self;
+impl<Dom:Debug+Hash+PartialEq+Eq+Clone+'static,
+     Cod:Debug+Hash+PartialEq+Eq+Clone+'static>
+    MapIntro<Dom,Cod>
+    for
+    Trie<(Dom,Cod)> {
+        fn empty () -> Self {
+            let meta = Meta { min_depth: 1 };
+            TrieIntro::empty(meta)
+        }
+        fn update (map:Self, d:Dom, c:Cod) -> Self {
+            TrieIntro::extend(name_unit(), map, (d,c))
+        }
 }
 
-pub trait SetElim<X>: Debug + Hash + PartialEq + Eq + Clone + 'static {
-    fn mem(&Self, &X) -> bool;
-    fn fold<Res, F>(Self, Res, Rc<F>) -> Res where F: Fn(X, Res) -> Res;
-}
+impl<Dom:Debug+Hash+PartialEq+Eq+Clone+'static,
+     Cod:Debug+Hash+PartialEq+Eq+Clone+'static>
+    MapElim<Dom,Cod>
+    for
+    Trie<(Dom,Cod)> {
+        fn find<'a> (map:&'a Self, d:&Dom) -> Option<Cod> {
+            let mut hasher = DefaultHasher::new();
+            d.hash(&mut hasher);
+            let i = hasher.finish() as i64;
+            fn find_hash<'a,
+                         Dom:Debug+Hash+PartialEq+Eq+Clone+'static,
+                         Cod:Debug+Hash+PartialEq+Eq+Clone+'static>
+                (map:&'a Trie<(Dom,Cod)>,d:&Dom,i:i64) -> Option<Cod> {
+                    TrieElim::elim_ref(map,
+                                       |_| None,
+                                       |_, &(ref d2, ref c)| if *d == *d2 { Some(c.clone()) } else { None },
+                                       |_, left, right| if i % 2 == 0 {
+                                           find_hash(left, d, i >> 1)
+                                       } else {
+                                           find_hash(right, d, i >> 1)
+                                       },
+                                       |_, t| find_hash(t, d, i),
+                                       |_, t| find_hash(t, d, i))
+                };
+            find_hash(map, d, i)
+        }
 
-impl<X, Set: TrieIntro<X> + TrieElim<X>> SetIntro<X> for Set {
-    fn empty() -> Self {
-        let meta = Meta { min_depth: 1 };
-        Self::empty(meta)
-    }
+        fn remove (_map:Self, _d:&Dom) -> (Self, Option<Cod>) {
+            unimplemented!()
+        }
 
-    fn add(set: Self, elt: X) -> Self {
-        Self::extend(name_unit(), set, elt)
-    }
-}
+        fn fold<Res,F> (map:Self, res:Res, body:Rc<F>) -> Res
+            where F:Fn(Dom, Cod, Res) -> Res+'static,
+                  Res:Hash+Debug+Eq+Clone+'static
 
-impl<X: Hash, Set: TrieIntro<X> + TrieElim<X>> SetElim<X> for Set {
-    fn mem(set: &Self, elt: &X) -> bool {
-        let mut hasher = DefaultHasher::new();
-        elt.hash(&mut hasher);
-        match Set::find(set, elt, hasher.finish() as i64) {
-            Some(_) => true,
-            None => false,
+        {
+            trie_fold(map, res, Rc::new(move |(d,c),r|(*body)(d,c,r)) )
+        }
+
+        fn append(_map:Self, _other:Self) -> Self {
+            unimplemented!()
         }
     }
 
-    fn fold<Res, F>(set: Self, res: Res, f: Rc<F>) -> Res
-        where F: Fn(X, Res) -> Res
-    {
-        Self::elim_arg(set,
-                       res,
-                       |_, arg| arg,
-                       |_, x, arg| f(x, arg),
-                       |_, left, right, arg| {
-                           Self::fold(right, Self::fold(left, arg, f.clone()), f.clone())
-                       },
-                       |_, t, arg| Self::fold(t, arg, f.clone()),
-                       |_, t, arg| Self::fold(t, arg, f.clone()))
-    }
-}
+pub type Set<X> = Trie<(X, ())>;
 
-pub type Set<X> = Trie<X>;
 pub fn trie_fold
-    <X, T:TrieElim<X>, Res:Hash+Debug+Eq+Clone+'static, F:'static>
+    <X, T:TrieElim<X>, Res:Hash+Debug+Eq+Clone+'static, F: 'static>
     (t: T, res:Res, f: Rc<F>) -> Res
     where F: Fn(X, Res) -> Res {
     T::elim_arg(t,
@@ -490,4 +499,20 @@ pub fn trie_of_list<X: Hash + Clone + Debug + 'static,
     list_fold(list,
               T::empty(Meta { min_depth: 1 }),
               Rc::new(|x, trie_acc| T::extend(name_unit(), trie_acc, x)))
+}
+
+pub fn list_of_trie<X: Hash + Clone + Debug, T: TrieElim<X> + 'static, L: ListIntro<X> + 'static>
+    (trie: T)
+     -> L {
+    trie_fold(trie,
+              ListIntro::nil(),
+              Rc::new(|elt, list| ListIntro::cons(elt, list)))
+}
+
+pub fn list_of_trieset<X: Hash + Clone + Debug, S: TrieElim<(X, ())> + 'static, L: ListIntro<X> + 'static>
+    (set: S)
+     -> L {
+        trie_fold(set,
+                  ListIntro::nil(),
+                  Rc::new(|(elt, ()), list| ListIntro::cons(elt, list)))
 }
