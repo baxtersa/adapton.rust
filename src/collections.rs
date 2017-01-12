@@ -443,15 +443,18 @@ pub trait MapElim<Dom,Cod>
 {
   fn find(&Self, d:&Dom) -> Option<Cod>;
   fn remove (Self, d:&Dom) -> (Self, Option<Cod>);
-  fn fold<Res,F>(Self, Res, Rc<F>) -> Res where
-    F:Fn(Dom, Cod, Res) -> Res;
+  fn fold<Res,F>(Self, Res, Rc<F>) -> Res
+        where F:Fn(Dom, Cod, Res) -> Res+'static,
+              Res:Hash+Debug+Eq+Clone+'static;
   fn append(Self, other:Self) -> Self;
 }
 
 pub fn map_empty<Dom,Cod,M:MapIntro<Dom,Cod>>() -> M { M::empty() }
 pub fn map_update<Dom,Cod,M:MapIntro<Dom,Cod>>(map:M, d:Dom, c:Cod) -> M { M::update(map, d, c) }
 pub fn map_find<Dom,Cod,M:MapElim<Dom,Cod>>(map:&M, d:&Dom) -> Option<Cod> { M::find(map, d) }
-pub fn map_fold<Dom,Cod,M:MapElim<Dom,Cod>,F,Res>(map:M, r:Res, f:Rc<F>) -> Res where F:Fn(Dom,Cod, Res) -> Res { M::fold(map, r, f) }
+pub fn map_fold<Dom,Cod,M:MapElim<Dom,Cod>,F,Res>(map:M, r:Res, f:Rc<F>) -> Res
+    where F:Fn(Dom,Cod, Res) -> Res+'static,
+          Res:Hash+Debug+Eq+Clone+'static { M::fold(map, r, f) }
 
 pub trait SetIntro<Elm>
   : Debug+Hash+PartialEq+Eq+Clone+'static
@@ -492,7 +495,8 @@ pub trait SetElim<Elm>
 {
   fn is_mem (set:&Self, e:&Elm) -> bool;
   fn fold<Res,F>(set:Self, Res, F) -> Res where
-    F:Fn(Elm, Res) -> Res;
+        F:Fn(Elm, Res) -> Res+'static,
+        Res:Hash+Debug+Eq+Clone+'static;
 }
 
 impl<Elm,Map:MapElim<Elm,()>> SetElim<Elm> for Map {
@@ -503,9 +507,10 @@ impl<Elm,Map:MapElim<Elm,()>> SetElim<Elm> for Map {
     }
   }
   fn fold<Res,F>(set:Self, res:Res, f:F) -> Res where
-    F:Fn(Elm, Res) -> Res
+        F:Fn(Elm, Res) -> Res+'static,
+        Res:Hash+Debug+Eq+Clone+'static
   {
-    Map::fold(set, res, Rc::new(|elm, (), res| f(elm, res)))
+    Map::fold(set, res, Rc::new(move |elm, (), res| f(elm, res)))
   }
 }
 
