@@ -398,30 +398,33 @@ impl<Dom:Debug+Hash+PartialEq+Eq+Clone+'static,
     MapElim<Dom,Cod>
     for
     Trie<(Dom,Cod)> {
-        fn find<'a> (map:&'a Self, d:&Dom) -> Option<Cod> {
+        fn find(map:&Self, d:&Dom) -> Option<Cod> {
             let mut hasher = DefaultHasher::new();
             d.hash(&mut hasher);
             let i = hasher.finish() as i64;
-            fn find_hash<'a,
+            fn find_hash<
                          Dom:Debug+Hash+PartialEq+Eq+Clone+'static,
                          Cod:Debug+Hash+PartialEq+Eq+Clone+'static>
-                (map:&'a Trie<(Dom,Cod)>,d:&Dom,i:i64) -> Option<Cod> {
-                    TrieElim::elim_ref(map,
-                                       |_| None,
-                                       |_, &(ref d2, ref c)| if *d == *d2 {
-                                           Some(c.clone())
-                                       } else {
-                                           None
-                                       },
-                                       |_, left, right| if i % 2 == 0 {
-                                           find_hash(left, d, i >> 1)
-                                       } else {
-                                           find_hash(right, d, i >> 1)
-                                       },
-                                       |_, t| find_hash(t, d, i),
-                                       |_, t| find_hash(t, d, i))
+                (map:Trie<(Dom,Cod)>,d:Dom,i:i64) -> Option<Cod> {
+                    let d = &d;
+                    TrieElim::elim(map,
+                                   |_| None,
+                                   |_, (d2, c)| if d.clone() == d2 {
+                                       Some(c.clone())
+                                   } else {
+                                       None
+                                   },
+                                   |_, left, right| if i % 2 == 0 {
+                                       find_hash(left, d.clone(), i >> 1)
+                                   } else {
+                                       find_hash(right, d.clone(), i >> 1)
+                                   },
+                                   |_, t| find_hash(t, d.clone(), i),
+                                   |nm: Name, t| {
+                                       memo!(nm =>> find_hash, map:t, d:d.clone(), i:i)
+                                   })
                 };
-            find_hash(map, d, i)
+            find_hash(map.clone(), d.clone(), i)
         }
 
         fn remove (_map:Self, _d:&Dom) -> (Self, Option<Cod>) {
