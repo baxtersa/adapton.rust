@@ -202,7 +202,7 @@ impl<X: Debug + Hash + PartialEq + Eq + Clone + 'static> TrieIntro<X> for Trie<X
         }
         let min = min(meta.min_depth, BS::MAX_LEN);
         let meta = Meta { min_depth: min };
-        let nm = name_of_str("empty");
+        let nm = name_of_str("trie_empty");
         let (nm1, nm2) = name_fork(nm);
         let mtbs = BS {
             length: 0,
@@ -383,8 +383,10 @@ impl<Dom:Debug+Hash+PartialEq+Eq+Clone+'static,
     for
     Trie<(Dom,Cod)> {
         fn empty () -> Self {
-            let meta = Meta { min_depth: 1 };
-            TrieIntro::empty(meta)
+            ns(name_of_str("map_intro_trie_empty"), || {
+                let meta = Meta { min_depth: 1 };
+                TrieIntro::empty(meta)
+            })
         }
         fn update (map:Self, d:Dom, c:Cod) -> Self {
             TrieIntro::extend(name_unit(), map, (d,c))
@@ -406,7 +408,11 @@ impl<Dom:Debug+Hash+PartialEq+Eq+Clone+'static,
                 (map:&'a Trie<(Dom,Cod)>,d:&Dom,i:i64) -> Option<Cod> {
                     TrieElim::elim_ref(map,
                                        |_| None,
-                                       |_, &(ref d2, ref c)| if *d == *d2 { Some(c.clone()) } else { None },
+                                       |_, &(ref d2, ref c)| if *d == *d2 {
+                                           Some(c.clone())
+                                       } else {
+                                           None
+                                       },
                                        |_, left, right| if i % 2 == 0 {
                                            find_hash(left, d, i >> 1)
                                        } else {
@@ -450,7 +456,42 @@ pub fn trie_fold
                 |nm, t, (arg, f)| memo!(nm =>> trie_fold, t:t, res:arg ;; f:f))
 }
 
-pub fn trie_of_list<X: Hash + Clone + Debug + 'static,
+pub fn trie_fold_seq<X,
+                     T: TrieElim<X>,
+                     Res: Hash + Debug + Eq + Clone + 'static,
+                     LeafC: 'static,
+                     BinC: 'static,
+                     NameC: 'static>
+    (trie: T,
+     res: Res,
+     leaf: Rc<LeafC>,
+     bin: Rc<BinC>,
+     name: Rc<NameC>)
+     -> Res
+    where LeafC: Fn(X, Res) -> Res,
+          BinC: Fn(Res) -> Res,
+          NameC: Fn(Name, Res) -> Res
+{
+    T::elim_arg(trie,
+                (res, (leaf, bin, name)),
+                |_, (res, _)| res,
+                |_, x, (res, (leaf, _, _))| leaf(x, res),
+                |_, left, right, (res, (leaf, bin, name))| {
+                    let res = trie_fold_seq(left, res, leaf.clone(), bin.clone(), name.clone());
+                    let res = (&bin)(res);
+                    let res = trie_fold_seq(right, res, leaf, bin, name);
+                    res
+                },
+                |_, t, (res, (leaf, bin, name))| trie_fold_seq(t, res, leaf, bin, name),
+                |nm, t, (res, (leaf, bin, name))| {
+                    let res = memo!(nm.clone() =>> trie_fold_seq, trie:t, res:res ;;
+                                    leaf:leaf, bin:bin, name:name.clone());
+                    let res = name(nm, res);
+                    res
+                })
+}
+
+pub fn trie_of_list<X: Hash + Clone + Debug,
                     T: TrieIntro<X> + 'static,
                     L: ListElim<X> + ListIntro<X> + 'static>
     (list: L)
@@ -468,10 +509,12 @@ pub fn list_of_trie<X: Hash + Clone + Debug, T: TrieElim<X> + 'static, L: ListIn
               Rc::new(|elt, list| ListIntro::cons(elt, list)))
 }
 
-pub fn list_of_trieset<X: Hash + Clone + Debug, S: TrieElim<(X, ())> + 'static, L: ListIntro<X> + 'static>
+pub fn list_of_trieset<X: Hash + Clone + Debug,
+                       S: TrieElim<(X, ())> + 'static,
+                       L: ListIntro<X> + 'static>
     (set: S)
      -> L {
-        trie_fold(set,
+    trie_fold(set,
                   ListIntro::nil(),
                   Rc::new(|(elt, ()), list| ListIntro::cons(elt, list)))
 }
