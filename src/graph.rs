@@ -7,8 +7,7 @@ use std::rc::Rc;
 use adapton::engine::{cell, ns, name_of_str, name_unit, Name};
 use adapton::collections::{list_of_tree, tree_fold_seq, tree_of_list, Dir2, List, ListIntro,
                            MapIntro, MapElim, SetIntro, Tree, TreeIntro};
-use adapton::collections::trie::{trie_fold_seq, trie_fold_seq_nm, Set, Trie,
-                                 TrieIntro};
+use adapton::collections::trie::{trie_fold_seq, trie_fold_seq_nm, Set, Trie, TrieIntro};
 
 /// Representation of a graph as a list of edges, where edges are
 /// a pair of node ids.
