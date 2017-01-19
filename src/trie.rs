@@ -403,28 +403,27 @@ impl<Dom:Debug+Hash+PartialEq+Eq+Clone+'static,
             d.hash(&mut hasher);
             let i = hasher.finish() as i64;
             fn find_hash<
-                         Dom:Debug+Hash+PartialEq+Eq+Clone+'static,
-                         Cod:Debug+Hash+PartialEq+Eq+Clone+'static>
-                (map:Trie<(Dom,Cod)>,d:Dom,i:i64) -> Option<Cod> {
-                    let d = &d;
-                    TrieElim::elim(map,
-                                   |_| None,
-                                   |_, (d2, c)| if d.clone() == d2 {
-                                       Some(c.clone())
-                                   } else {
-                                       None
-                                   },
-                                   |_, left, right| if i % 2 == 0 {
-                                       find_hash(left, d.clone(), i >> 1)
-                                   } else {
-                                       find_hash(right, d.clone(), i >> 1)
-                                   },
-                                   |_, t| find_hash(t, d.clone(), i),
-                                   |nm: Name, t| {
-                                       memo!(nm =>> find_hash, map:t, d:d.clone(), i:i)
-                                   })
+                    Dom:Debug+Hash+PartialEq+Eq+Clone+'static,
+                Cod:Debug+Hash+PartialEq+Eq+Clone+'static>
+                (map:&Trie<(Dom,Cod)>,d:&Dom,i:i64) -> Option<Cod> {
+                    TrieElim::elim_ref(map,
+                                       |_| None,
+                                       |_, &(ref d2, ref c)| if *d == *d2 {
+                                           Some(c.clone())
+                                       } else {
+                                           None
+                                       },
+                                       |_, ref left, ref right| if i % 2 == 0 {
+                                           find_hash(left, d, i >> 1)
+                                       } else {
+                                           find_hash(right, d, i >> 1)
+                                       },
+                                       |_, ref t| find_hash(t, d, i),
+                                       |_, ref t| {
+                                           find_hash(t, d, i)
+                                       })
                 };
-            find_hash(map.clone(), d.clone(), i)
+            find_hash(map, d, i)
         }
 
         fn remove (_map:Self, _d:&Dom) -> (Self, Option<Cod>) {
@@ -561,4 +560,69 @@ pub fn list_of_trieset<X: Hash + Clone + Debug,
     trie_fold(set,
                   ListIntro::nil(),
                   Rc::new(|(elt, ()), list| ListIntro::cons(elt, list)))
+}
+
+pub fn trie_fold_up<X,
+                    T: TrieElim<X>,
+                    Res: Hash + Debug + Eq + Clone + 'static,
+                    NilF: 'static,
+                    LeafF: 'static,
+                    BinF: 'static,
+                    RootF: 'static,
+                    NameF: 'static>
+    (trie: T,
+     nil: Rc<NilF>,
+     leaf: Rc<LeafF>,
+     bin: Rc<BinF>,
+     root: Rc<RootF>,
+     name: Rc<NameF>)
+     -> Res
+    where NilF: Fn(BS) -> Res,
+          LeafF: Fn(BS, X) -> Res,
+          BinF: Fn(BS, Res, Res) -> Res,
+          RootF: Fn(Meta, Res) -> Res,
+          NameF: Fn(Name, Res) -> Res
+{
+    T::elim_arg(trie,
+                (nil, leaf, bin, root, name),
+                |bs, (nil, _, _, _, _)| nil(bs),
+                |bs, x, (_, leaf, _, _, _)| leaf(bs, x),
+                |x, l, r, (nil, leaf, bin, root, name)| {
+        let resl = trie_fold_up(l,
+                                nil.clone(),
+                                leaf.clone(),
+                                bin.clone(),
+                                root.clone(),
+                                name.clone());
+        let resr = trie_fold_up(r, nil, leaf, bin.clone(), root, name);
+        let res = bin(x, resl, resr);
+        res
+    },
+                |meta, t, (nil, leaf, bin, root, name)| {
+                    let res = trie_fold_up(t, nil, leaf, bin, root.clone(), name);
+                    root(meta, res)
+                },
+                |n, t, (nil, leaf, bin, root, name)| {
+                    let res = memo!(n.clone() =>> trie_fold_up, trie:t ;;
+                                    nil:nil, leaf:leaf, bin:bin, root:root, name:name.clone());
+                    let res = name(n, res);
+                    res
+                })
+}
+
+/// Produces a trie with the same structure as its input, but without
+/// any articulations.  Useful for `println`-style debugging, and for
+/// equality comparisons across distinct engine implementations (e.g.,
+/// to verify the DCG-based engine).
+pub fn eager_trie_of_trie<X: Hash + Clone + 'static,
+                          TE: TrieElim<X> + 'static,
+                          TI: TrieIntro<X> + 'static>
+    (trie: TE)
+     -> TI {
+    trie_fold_up(trie,
+                 Rc::new(|bs| TI::nil(bs)),
+                 Rc::new(|bs, x| TI::leaf(bs, x)),
+                 Rc::new(|bs, l, r| TI::bin(bs, l, r)),
+                 Rc::new(|meta, t| TI::root(meta, t)),
+                 Rc::new(|n, t| TI::name(n, t)))
 }

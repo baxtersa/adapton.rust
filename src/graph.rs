@@ -7,7 +7,7 @@ use std::rc::Rc;
 use adapton::engine::{cell, ns, name_of_str, name_unit, Name};
 use adapton::collections::{list_of_tree, tree_fold_seq, tree_of_list, Dir2, List, ListIntro,
                            MapIntro, MapElim, SetIntro, Tree, TreeIntro};
-use adapton::collections::trie::{trie_fold_seq, trie_fold_seq_nm, Set, Trie, TrieIntro};
+use adapton::collections::trie::{trie_fold_seq, Set, Trie, TrieIntro};
 
 /// Representation of a graph as a list of edges, where edges are
 /// a pair of node ids.
@@ -159,20 +159,14 @@ impl<Node: Debug + Copy + Clone + Hash + PartialEq + Eq + 'static>
 pub fn adjacency_of_edge_list<X: Hash + Clone + Debug + PartialEq + Eq>(el_graph: &Graph<X>)
                                                                         -> AdjacencyGraph<X> {
     let adj_graph = AdjacencyGraph::empty();
-    trie_fold_seq_nm(Graph::edges(el_graph), adj_graph, None,
-                     Rc::new(|nm, ((src,dst),()), g| {
-                         if let Some(nm) = nm {
-                             AdjacencyGraph::add_edge(g, nm, src, dst)
-                         } else {
-                             AdjacencyGraph::add_edge(g, name_unit(), src, dst)
-                         }
-                     }),
-                     Rc::new(|g| g),
-                     Rc::new(|nm: Name, g: AdjacencyGraph<_>| {
-                         let adj = TrieIntro::name(nm.clone(),
-                                                   TrieIntro::art(cell(nm, g.adjacency_map)));
-                         AdjacencyGraph {
-                             adjacency_map: adj,
-                         }
-                     }))
+    tree_fold_seq(el_graph.edge_tree.clone(),
+                  Dir2::Left,
+                  adj_graph,
+                  Rc::new(|(src, dst), g| AdjacencyGraph::add_edge(g, name_unit(), src, dst)),
+                  Rc::new(|_, set| set),
+                  Rc::new(|nm: Name, _, g: AdjacencyGraph<_>| {
+                      let adj = TrieIntro::name(nm.clone(),
+                                                TrieIntro::art(cell(nm, g.adjacency_map)));
+                      AdjacencyGraph { adjacency_map: adj }
+                  }))
 }

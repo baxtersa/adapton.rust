@@ -68,7 +68,8 @@ mod graph_conversion {
 
         for i in (1..max / 2 - 1).into_iter() {
             let j = max - i;
-            input = GraphIntro::add_edge(input, name_pair(name_of_usize(i), name_of_usize(j)), i, j);
+            input =
+                GraphIntro::add_edge(input, name_pair(name_of_usize(i), name_of_usize(j)), i, j);
 
             b.iter(|| convert_to_adj(&input));
         }
