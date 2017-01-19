@@ -494,6 +494,47 @@ pub fn trie_fold_seq<X,
                 })
 }
 
+pub fn trie_fold_seq_nm<X,
+                        T: TrieElim<X>,
+                        Res: Hash + Debug + Eq + Clone + 'static,
+                        LeafC: 'static,
+                        BinC: 'static,
+                        NameC: 'static>
+    (trie: T,
+     res: Res,
+     nm: Option<Name>,
+     leaf: Rc<LeafC>,
+     bin: Rc<BinC>,
+     name: Rc<NameC>)
+     -> Res
+    where LeafC: Fn(Option<Name>, X, Res) -> Res,
+          BinC: Fn(Res) -> Res,
+          NameC: Fn(Name, Res) -> Res
+{
+    T::elim_arg(trie,
+                (res, (nm, leaf, bin, name)),
+                |_, (res, _)| res,
+                |_, x, (res, (nm, leaf, _, _))| leaf(nm, x, res),
+                |_, left, right, (res, (nm, leaf, bin, name))| {
+        let res = trie_fold_seq_nm(left,
+                                   res,
+                                   nm.clone(),
+                                   leaf.clone(),
+                                   bin.clone(),
+                                   name.clone());
+        let res = (&bin)(res);
+        let res = trie_fold_seq_nm(right, res, nm, leaf, bin, name);
+        res
+    },
+                |_, t, (res, (nm, leaf, bin, name))| trie_fold_seq_nm(t, res, nm, leaf, bin, name),
+                |n, t, (res, (_, leaf, bin, name))| {
+        let res = memo!(n.clone() =>> trie_fold_seq_nm, trie:t, res:res, nm:Some(n.clone()) ;;
+                                    leaf:leaf, bin:bin, name:name.clone());
+        let res = name(n, res);
+        res
+    })
+}
+
 pub fn trie_of_list<X: Hash + Clone + Debug,
                     T: TrieIntro<X> + 'static,
                     L: ListElim<X> + ListIntro<X> + 'static>
