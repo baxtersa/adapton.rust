@@ -32,6 +32,7 @@ pub mod collections ;
 
 // various sub-modules of the public modules above:
 mod bitstring ;
+mod graph ;
 mod trie ;
 mod reflect ;
 

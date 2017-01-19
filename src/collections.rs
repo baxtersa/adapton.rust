@@ -13,6 +13,10 @@ pub mod trie {
   pub use trie::*;
 }
 
+pub mod graph {
+    pub use graph::*;
+}
+
 #[derive(Clone,Copy,Hash,Eq,PartialEq,Debug)]
 pub enum Dir2 { Left, Right }
 
