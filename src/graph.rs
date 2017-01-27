@@ -25,6 +25,10 @@ pub struct AdjacencyGraph<Node>
     adjacency_map: Trie<(Node, Tree<Node>)>,
 }
 
+trait NamedGraph<Node>: Debug + Clone + Hash + PartialEq + Eq {
+    fn name(nm: Name, g: Self) -> Self;
+}
+
 /// Produce a graph.
 pub trait GraphIntro<Node>: Debug + Clone + Hash + PartialEq + Eq {
     /// Yields an empty graph, i.e. no vertices or edges.
@@ -39,6 +43,19 @@ pub trait GraphElim<Node>: Debug + Clone + Hash + PartialEq + Eq {
     fn edges(graph: &Self) -> Set<(Node, Node)>;
     /// Returns a set of the vertices of the graph `graph`.
     fn vertices(graph: &Self) -> Set<Node>;
+    /// Returns a graph whose set of edges are the reversed edges of `graph`.
+    fn reverse_edges(graph: &Self) -> Self;
+}
+
+impl<Node: Debug + Clone + Hash + PartialEq + Eq + 'static> NamedGraph<Node> for Graph<Node> {
+    fn name(nm: Name, g: Graph<Node>) -> Graph<Node> {
+        let edge_list = ns(name_of_str("list_of_tree"),
+                           move || list_of_tree(g.edge_tree, Dir2::Left));
+        let el = List::name_art(Some(nm), edge_list);
+        let edge_tree = ns(name_of_str("tree_of_list"),
+                           || tree_of_list::<_, _, Tree<_>, _>(Dir2::Left, el));
+        Graph::<Node> { edge_tree: edge_tree }
+    }
 }
 
 impl<Node: Debug + Clone + Hash + PartialEq + Eq + 'static> GraphIntro<Node> for Graph<Node> {
@@ -81,6 +98,24 @@ impl<Node: Debug + Clone + Hash + PartialEq + Eq + 'static> GraphElim<Node> for 
                       Rc::new(move |n: Name, set| {
                           Set::name(n.clone(), Set::art(cell(n, set)))
                       }))
+    }
+
+    fn reverse_edges(graph: &Graph<Node>) -> Graph<Node> {
+        let es = Self::edges(graph);
+        trie_fold_seq(es,
+                      Self::empty(),
+                      Rc::new(|((src, dst), ()), g| Self::add_edge(g, name_unit(), dst, src)),
+                      Rc::new(|g| g),
+                      Rc::new(|nm: Name, g| Self::name(nm, g)))
+    }
+}
+
+impl<Node: Debug + Clone + Hash + PartialEq + Eq + 'static> NamedGraph<Node>
+    for AdjacencyGraph<Node> {
+    fn name(nm: Name, g: AdjacencyGraph<Node>) -> AdjacencyGraph<Node> {
+        let adj = TrieIntro::name(nm.clone(),
+                                  TrieIntro::art(cell(nm, g.adjacency_map)));
+        AdjacencyGraph { adjacency_map: adj }
     }
 }
 
@@ -154,6 +189,15 @@ impl<Node: Debug + Copy + Clone + Hash + PartialEq + Eq + 'static>
                           Rc::new(|nm: Name, set| TrieIntro::name(nm.clone(),
                                                                   TrieIntro::art(cell(nm, set)))))
         }
+
+        fn reverse_edges(graph: &AdjacencyGraph<Node>) -> AdjacencyGraph<Node> {
+            let es = Self::edges(graph);
+            trie_fold_seq(es,
+                          Self::empty(),
+                          Rc::new(|((src, dst), ()), g| Self::add_edge(g, name_unit(), dst, src)),
+                          Rc::new(|g| g),
+                          Rc::new(|nm: Name, g| Self::name(nm, g)))
+        }
     }
 
 pub fn adjacency_of_edge_list<X: Hash + Clone + Debug + PartialEq + Eq>(el_graph: &Graph<X>)
@@ -199,12 +243,5 @@ pub fn edge_list_of_adjacency
         Graph::<X> { edge_tree: edge_tree }
     }),
                   Rc::new(|g| g),
-                  Rc::new(|nm: Name, g: Graph<X>| {
-        let edge_list = ns(name_of_str("list_of_tree"),
-                           move || list_of_tree(g.edge_tree, Dir2::Left));
-        let el = List::name_art(Some(nm), edge_list);
-        let edge_tree = ns(name_of_str("tree_of_list"),
-                           || tree_of_list::<_, _, Tree<_>, _>(Dir2::Left, el));
-        Graph::<X> { edge_tree: edge_tree }
-    }))
+                  Rc::new(|nm: Name, g: Graph<X>| Graph::name(nm, g)))
 }
