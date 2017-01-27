@@ -171,37 +171,40 @@ pub fn adjacency_of_edge_list<X: Hash + Clone + Debug + PartialEq + Eq>(el_graph
                   }))
 }
 
-pub fn edge_list_of_adjacency<X: Hash + Clone + Debug + PartialEq + Eq>(adj_graph: &AdjacencyGraph<X>)
-                                                                        -> Graph<X> {
+pub fn edge_list_of_adjacency
+    <X: Hash + Clone + Debug + PartialEq + Eq>(adj_graph: &AdjacencyGraph<X>)
+                                               -> Graph<X> {
     let edge_list = Graph::empty();
     trie_fold_seq(adj_graph.adjacency_map.clone(),
                   edge_list,
                   Rc::new(|(src, dsts): (X, Tree<X>), graph: Graph<X>| {
-                      let edge_tree = tree_fold_seq(dsts, Dir2::Left, graph.edge_tree,
-                                                    Rc::new(move |dst, g| {
-                                                        let edge_list = ns(name_of_str("list_of_tree"),
-                                                                           move || list_of_tree(g, Dir2::Left));
-                                                        let el = List::cons((src.clone(), dst), edge_list);
-                                                        ns(name_of_str("tree_of_list"),
-                                                           || tree_of_list::<_, _, Tree<_>, _>(Dir2::Left, el))
-                                                    }),
-                                                    Rc::new(|_, g| g),
-                                                    Rc::new(|nm: Name, _, g| {
-                                                        let edge_list = ns(name_of_str("list_of_tree"),
-                                                                           move || list_of_tree(g, Dir2::Left));
-                                                        let el = List::name_art(Some(nm), edge_list);
-                                                        ns(name_of_str("tree_of_list"),
-                                                           || tree_of_list::<_, _, Tree<_>, _>(Dir2::Left, el))
-                                                    }));
-                      Graph::<X> { edge_tree: edge_tree }
-                  }),
+        let edge_tree = tree_fold_seq(dsts,
+                                      Dir2::Left,
+                                      graph.edge_tree,
+                                      Rc::new(move |dst, g| {
+            let edge_list = ns(name_of_str("list_of_tree"),
+                               move || list_of_tree(g, Dir2::Left));
+            let el = List::cons((src.clone(), dst), edge_list);
+            ns(name_of_str("tree_of_list"),
+               || tree_of_list::<_, _, Tree<_>, _>(Dir2::Left, el))
+        }),
+                                      Rc::new(|_, g| g),
+                                      Rc::new(|nm: Name, _, g| {
+            let edge_list = ns(name_of_str("list_of_tree"),
+                               move || list_of_tree(g, Dir2::Left));
+            let el = List::name_art(Some(nm), edge_list);
+            ns(name_of_str("tree_of_list"),
+               || tree_of_list::<_, _, Tree<_>, _>(Dir2::Left, el))
+        }));
+        Graph::<X> { edge_tree: edge_tree }
+    }),
                   Rc::new(|g| g),
                   Rc::new(|nm: Name, g: Graph<X>| {
-                      let edge_list = ns(name_of_str("list_of_tree"),
-                                         move || list_of_tree(g.edge_tree, Dir2::Left));
-                      let el = List::name_art(Some(nm), edge_list);
-                      let edge_tree = ns(name_of_str("tree_of_list"),
-                                         || tree_of_list::<_, _, Tree<_>, _>(Dir2::Left, el));
-                      Graph::<X> { edge_tree: edge_tree }
-                  }))
+        let edge_list = ns(name_of_str("list_of_tree"),
+                           move || list_of_tree(g.edge_tree, Dir2::Left));
+        let el = List::name_art(Some(nm), edge_list);
+        let edge_tree = ns(name_of_str("tree_of_list"),
+                           || tree_of_list::<_, _, Tree<_>, _>(Dir2::Left, el));
+        Graph::<X> { edge_tree: edge_tree }
+    }))
 }
