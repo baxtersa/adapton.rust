@@ -208,11 +208,7 @@ pub fn adjacency_of_edge_list<X: Hash + Clone + Debug + PartialEq + Eq>(el_graph
                   adj_graph,
                   Rc::new(|(src, dst), g| AdjacencyGraph::add_edge(g, name_unit(), src, dst)),
                   Rc::new(|_, set| set),
-                  Rc::new(|nm: Name, _, g: AdjacencyGraph<_>| {
-                      let adj = TrieIntro::name(nm.clone(),
-                                                TrieIntro::art(cell(nm, g.adjacency_map)));
-                      AdjacencyGraph { adjacency_map: adj }
-                  }))
+                  Rc::new(|nm: Name, _, g: AdjacencyGraph<_>| AdjacencyGraph::name(nm, g)))
 }
 
 pub fn edge_list_of_adjacency
