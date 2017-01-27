@@ -61,29 +61,51 @@ mod graph_conversion {
         ns(name_of_str("convert_to_adj"), || adjacency_of_edge_list(g))
     }
 
-    fn run_graph_bench(b: &mut Bencher) {
-        let mut input = Graph::empty();
+    fn convert_to_edge_list(g: &AdjacencyGraph<usize>) -> Graph<usize> {
+        ns(name_of_str("convert_to_edge_list"),
+           || edge_list_of_adjacency(g))
+    }
+
+    fn run_graph_bench<From: GraphIntro<usize> + GraphElim<usize>,
+                       To: GraphIntro<usize> + GraphElim<usize>,
+                       Runner>
+        (b: &mut Bencher,
+         f: Runner)
+        where Runner: Fn(&From) -> To
+    {
+        let mut input = From::empty();
 
         let max = 100;
 
         for i in (1..max / 2 - 1).into_iter() {
             let j = max - i;
-            input =
-                GraphIntro::add_edge(input, name_pair(name_of_usize(i), name_of_usize(j)), i, j);
+            input = From::add_edge(input, name_pair(name_of_usize(i), name_of_usize(j)), i, j);
 
-            b.iter(|| convert_to_adj(&input));
+            b.iter(|| f(&input));
         }
     }
 
     #[bench]
     fn benchmark_naive_graph_to_adj(b: &mut Bencher) {
         init_naive();
-        run_graph_bench(b);
+        run_graph_bench(b, convert_to_adj);
     }
 
     #[bench]
     fn benchmark_dcg_graph_to_adj(b: &mut Bencher) {
         init_dcg();
-        run_graph_bench(b);
+        run_graph_bench(b, convert_to_adj);
+    }
+
+    #[bench]
+    fn benchmark_naive_adj_to_graph(b: &mut Bencher) {
+        init_naive();
+        run_graph_bench(b, convert_to_edge_list);
+    }
+
+    #[bench]
+    fn benchmark_dcg_adj_to_graph(b: &mut Bencher) {
+        init_dcg();
+        run_graph_bench(b, convert_to_edge_list);
     }
 }
