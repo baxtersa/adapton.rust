@@ -109,3 +109,51 @@ mod graph_conversion {
         run_graph_bench(b, convert_to_edge_list);
     }
 }
+
+mod graph_reverse {
+    use super::*;
+
+    fn reverse<G: GraphIntro<usize> + GraphElim<usize>>(g: &G) -> G {
+        ns(name_of_str("reverse_graph"), || G::reverse_edges(g))
+    }
+
+    fn run_bench<G: GraphIntro<usize> + GraphElim<usize>, GraphBuilder>(b: &mut Bencher,
+                                                                        builder: GraphBuilder)
+        where GraphBuilder: Fn() -> G
+    {
+        let mut input = builder();
+
+        let max = 100;
+
+        for i in (1..max / 2 - 1).into_iter() {
+            let j = max - i;
+            input = G::add_edge(input, name_pair(name_of_usize(i), name_of_usize(j)), i, j);
+
+            b.iter(|| reverse(&input));
+        }
+    }
+
+    #[bench]
+    fn benchmark_naive_graph(b: &mut Bencher) {
+        init_naive();
+        run_bench(b, Graph::empty);
+    }
+
+    #[bench]
+    fn benchmark_dcg_graph(b: &mut Bencher) {
+        init_dcg();
+        run_bench(b, Graph::empty);
+    }
+
+    #[bench]
+    fn benchmark_naive_adj_graph(b: &mut Bencher) {
+        init_naive();
+        run_bench(b, AdjacencyGraph::empty);
+    }
+
+    #[bench]
+    fn benchmark_dcg_adj_graph(b: &mut Bencher) {
+        init_dcg();
+        run_bench(b, AdjacencyGraph::empty);
+    }
+}
