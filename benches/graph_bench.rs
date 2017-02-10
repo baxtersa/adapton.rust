@@ -4,6 +4,7 @@ extern crate test;
 use self::test::Bencher;
 use adapton::collections::graph::*;
 use adapton::engine::*;
+use adapton::engine::manage::*;
 
 mod graph_add_edge {
     use super::*;
