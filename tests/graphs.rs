@@ -1,6 +1,7 @@
 extern crate adapton;
 
 use adapton::engine::*;
+use adapton::engine::manage::*;
 use adapton::collections::{tree_of_list, Dir2, SetElim, Tree};
 use adapton::collections::trie::*;
 use adapton::collections::graph::*;
