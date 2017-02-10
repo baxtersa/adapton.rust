@@ -534,7 +534,7 @@ pub fn trie_fold_seq_nm<X,
     })
 }
 
-pub fn trie_of_list<X: Hash + Clone + Debug,
+pub fn trie_of_list<X: Hash + Clone + Debug + 'static,
                     T: TrieIntro<X> + 'static,
                     L: ListElim<X> + ListIntro<X> + 'static>
     (list: L)
@@ -544,7 +544,9 @@ pub fn trie_of_list<X: Hash + Clone + Debug,
               Rc::new(|x, trie_acc| T::extend(name_unit(), trie_acc, x)))
 }
 
-pub fn list_of_trie<X: Hash + Clone + Debug, T: TrieElim<X> + 'static, L: ListIntro<X> + 'static>
+pub fn list_of_trie<X: Hash + Clone + Debug + 'static,
+                    T: TrieElim<X> + 'static,
+                    L: ListIntro<X> + 'static>
     (trie: T)
      -> L {
     trie_fold(trie,
@@ -552,7 +554,7 @@ pub fn list_of_trie<X: Hash + Clone + Debug, T: TrieElim<X> + 'static, L: ListIn
               Rc::new(|elt, list| ListIntro::cons(elt, list)))
 }
 
-pub fn list_of_trieset<X: Hash + Clone + Debug,
+pub fn list_of_trieset<X: Hash + Clone + Debug + 'static,
                        S: TrieElim<(X, ())> + 'static,
                        L: ListIntro<X> + 'static>
     (set: S)
